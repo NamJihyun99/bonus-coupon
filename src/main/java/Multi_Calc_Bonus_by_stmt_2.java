@@ -1,33 +1,36 @@
 import java.sql.*;
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 
-public class Calc_Bonus_by_stmt_3 {
+public class Multi_Calc_Bonus_by_stmt_2 {
 
-    static void run() {
-
+    public static void run(Connection conn, int startRow, int endRow) {
         int count = 0;
-        try (Connection conn = DBConnectionUtil.getNewConnection()) {
 
-            // 1. 테이블 초기화
-            CouponUtil.truncate(conn);
-
-            // 2. insert용 Statement는 1회만 생성하여 재사용
-            Statement insertStmt = conn.createStatement();
-
-            // 3. 지급 대상만 SELECT (WHERE 조건 포함)
+        try {
             Statement selectStmt = conn.createStatement();
             selectStmt.setFetchSize(10);
+
+            // 페이징 처리된 범위 조회
             ResultSet rs = selectStmt.executeQuery(
-                    "SELECT ID, EMAIL, CREDIT_LIMIT, GENDER, ADDRESS1 " +
-                            "FROM CUSTOMER " +
-                            "WHERE ENROLL_DT >= TO_DATE('20130101', 'YYYYMMDD') "
+                    String.format(
+                            "SELECT * FROM (SELECT ROWNUM AS RN, C.* FROM CUSTOMER C) " +
+                                    "WHERE RN BETWEEN %d AND %d",
+                            startRow, endRow
+                    )
             );
 
-            // 4. 공통 변수 정의
-            String yyyymm = "202506";
+            // insert용 Statement 단 1회 생성
+            Statement insertStmt = conn.createStatement();
 
-            // 5. 로직 수행
+            String yyyymm = "202506";
+            LocalDate baseDate = LocalDate.of(2013, 1, 1);
+
             while (rs.next()) {
+                Date enrollDt = rs.getDate("ENROLL_DT");
+                if (enrollDt == null || enrollDt.toLocalDate().isBefore(baseDate)) {
+                    continue;
+                }
+
                 String customerId = rs.getString("ID");
                 String email = rs.getString("EMAIL");
                 int credit = rs.getInt("CREDIT_LIMIT");
@@ -46,14 +49,14 @@ public class Calc_Bonus_by_stmt_3 {
                 count++;
             }
 
-            // 6. 자원 정리 및 종료 처리
             rs.close();
             selectStmt.close();
             insertStmt.close();
 
-            CouponUtil.countInsertion(conn);
+            System.out.printf("[THREAD %s] 처리 완료 - %d건%n", Thread.currentThread().getName(), count);
+
         } catch (SQLException e) {
-            System.err.println("[ERROR] 발송 건수: " + count);
+            System.err.printf("[THREAD %s] 오류 발생. insert count = %d%n", Thread.currentThread().getName(), count);
             e.printStackTrace();
         }
     }

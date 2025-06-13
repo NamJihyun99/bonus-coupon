@@ -1,29 +1,26 @@
 import java.sql.*;
 import java.time.LocalDate;
 
-public class Calc_Bonus_by_stmt_2 {
+public class Multi_Calc_Bonus_by_stmt_1 {
 
-    static void run() {
-
+    public static void run(Connection conn, int startRow, int endRow) {
         int count = 0;
-        try (Connection conn = DBConnectionUtil.getNewConnection()) {
 
-            // 1. 테이블 초기화
-            CouponUtil.truncate(conn);
+        try {
 
-            // 2. 고객 데이터 조회
-            Statement selectStmt = conn.createStatement();
-            selectStmt.setFetchSize(10);
-            ResultSet rs = selectStmt.executeQuery(
-                    "SELECT ID, EMAIL, ENROLL_DT, CREDIT_LIMIT, GENDER, ADDRESS1 FROM CUSTOMER"
+            // 1. 페이징 조회
+            Statement stmt = conn.createStatement();
+            stmt.setFetchSize(10);
+            ResultSet rs = stmt.executeQuery(
+                    String.format(
+                            "SELECT * FROM (SELECT ROWNUM AS RN, C.* FROM CUSTOMER C) " +
+                                    "WHERE RN BETWEEN %d AND %d",
+                            startRow, endRow
+                    )
             );
 
-            // 3. insert용 Statement 단 1회 생성
-            Statement insertStmt = conn.createStatement();
-
             String yyyymm = "202506";
-
-            LocalDate baseDate = LocalDate.of(2013, 1, 1);
+            LocalDate baseDate = LocalDate.of(2018, 1, 1);
 
             while (rs.next()) {
                 Date enrollDt = rs.getDate("ENROLL_DT");
@@ -39,26 +36,25 @@ public class Calc_Bonus_by_stmt_2 {
 
                 String couponCd = Coupon.getCode(credit, gender, addr);
 
-                // 4. INSERT SQL 생성ADDR
                 String insertSQL = String.format(
                         "INSERT INTO BONUS_COUPON (YYYYMM, CUSTOMER_ID, EMAIL, COUPON_CD, CREDIT_POINT, SEND_DT, RECEIVE_DT, USE_DT) " +
                                 "VALUES ('%s', '%s', '%s', '%s', %d, NULL, NULL, NULL)",
                         yyyymm, customerId, email, couponCd, credit
                 );
 
-                insertStmt.executeUpdate(insertSQL);
-                count++;
+                try (Statement insertStmt = conn.createStatement()) {
+                    insertStmt.executeUpdate(insertSQL);
+                    count++;
+                }
             }
 
-            // 리소스 반납
             rs.close();
-            selectStmt.close();
-            insertStmt.close();
+            stmt.close();
 
-            System.out.println(22222);
-            CouponUtil.countInsertion(conn);
+            System.out.printf("[THREAD %s] 처리 완료 - %d건%n", Thread.currentThread().getName(), count);
+
         } catch (SQLException e) {
-            System.err.println("[ERROR] 발송 건수: " + count);
+            System.err.printf("[THREAD %s] ERROR 발생. insert count = %d%n", Thread.currentThread().getName(), count);
             e.printStackTrace();
         }
     }

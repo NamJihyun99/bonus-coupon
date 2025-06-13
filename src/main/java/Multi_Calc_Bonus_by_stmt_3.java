@@ -1,32 +1,28 @@
 import java.sql.*;
-import java.text.SimpleDateFormat;
 
-public class Calc_Bonus_by_stmt_3 {
+public class Multi_Calc_Bonus_by_stmt_3 {
 
-    static void run() {
-
+    public static void run(Connection conn, int startRow, int endRow) {
         int count = 0;
-        try (Connection conn = DBConnectionUtil.getNewConnection()) {
 
-            // 1. 테이블 초기화
-            CouponUtil.truncate(conn);
-
-            // 2. insert용 Statement는 1회만 생성하여 재사용
-            Statement insertStmt = conn.createStatement();
-
-            // 3. 지급 대상만 SELECT (WHERE 조건 포함)
+        try {
+            // 지급 대상만 포함하는 조건 + ROWNUM으로 페이징
             Statement selectStmt = conn.createStatement();
             selectStmt.setFetchSize(10);
             ResultSet rs = selectStmt.executeQuery(
-                    "SELECT ID, EMAIL, CREDIT_LIMIT, GENDER, ADDRESS1 " +
-                            "FROM CUSTOMER " +
-                            "WHERE ENROLL_DT >= TO_DATE('20130101', 'YYYYMMDD') "
+                    String.format(
+                            "SELECT * FROM (SELECT ROWNUM AS RN, C.* " +
+                                    "FROM (SELECT ID, EMAIL, CREDIT_LIMIT, GENDER, ADDRESS1 " +
+                                    "      FROM CUSTOMER " +
+                                    "      WHERE ENROLL_DT >= TO_DATE('20130101', 'YYYYMMDD')) C) " +
+                                    "WHERE RN BETWEEN %d AND %d",
+                            startRow, endRow
+                    )
             );
 
-            // 4. 공통 변수 정의
+            Statement insertStmt = conn.createStatement();
             String yyyymm = "202506";
 
-            // 5. 로직 수행
             while (rs.next()) {
                 String customerId = rs.getString("ID");
                 String email = rs.getString("EMAIL");
@@ -46,15 +42,16 @@ public class Calc_Bonus_by_stmt_3 {
                 count++;
             }
 
-            // 6. 자원 정리 및 종료 처리
             rs.close();
             selectStmt.close();
             insertStmt.close();
 
-            CouponUtil.countInsertion(conn);
+            System.out.printf("[THREAD %s] 처리 완료 - %d건%n", Thread.currentThread().getName(), count);
+
         } catch (SQLException e) {
-            System.err.println("[ERROR] 발송 건수: " + count);
+            System.err.printf("[THREAD %s] 오류 발생. insert count = %d%n", Thread.currentThread().getName(), count);
             e.printStackTrace();
         }
     }
 }
+
