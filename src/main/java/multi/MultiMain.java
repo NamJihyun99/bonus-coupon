@@ -1,3 +1,7 @@
+package multi;
+
+import common.*;
+
 import java.sql.Connection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -13,7 +17,7 @@ public class MultiMain {
             try (Connection conn = DBConnectionUtil.getNewConnection()) {
                 CouponUtil.truncate(conn);  // 초기화는 메인 커넥션으로 한 번만 수행
 
-                // int totalRows = CouponUtil.countAll(conn);
+                // int totalRows = common.CouponUtil.countAll(conn);
                 int totalRows = CouponUtil.countCondition(conn);
                 int pageSize = (int) Math.ceil((double) totalRows / THREAD_COUNT);
 

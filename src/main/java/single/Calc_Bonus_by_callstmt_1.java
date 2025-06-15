@@ -1,3 +1,8 @@
+package single;
+
+import common.CouponUtil;
+import common.DBConnectionUtil;
+
 import java.sql.*;
 
 public class Calc_Bonus_by_callstmt_1 {
@@ -5,9 +10,10 @@ public class Calc_Bonus_by_callstmt_1 {
 
         int count = 0;
         try (Connection conn = DBConnectionUtil.getNewConnection()) {
-
+            // 1. BONUS_COUPON 테이블 초기화
             CouponUtil.truncate(conn);
 
+            // 2. Anonymous PL/SQL Block
             CallableStatement cstmt = conn.prepareCall(
                     "DECLARE\n" +
                             "    CURSOR cur IS\n" +
@@ -17,7 +23,7 @@ public class Calc_Bonus_by_callstmt_1 {
                             "    v_count NUMBER := 0;\n" +
                             "BEGIN\n" +
                             "    FOR rec IN cur LOOP\n" +
-                            "        IF rec.ENROLL_DT >= TO_DATE('20180101', 'YYYYMMDD') THEN\n" +
+                            "        IF rec.ENROLL_DT >= TO_DATE('20130101', 'YYYYMMDD') THEN\n" +
                             "            DECLARE\n" +
                             "                v_coupon_cd CHAR(2);\n" +
                             "            BEGIN\n" +
@@ -50,13 +56,14 @@ public class Calc_Bonus_by_callstmt_1 {
                             "            END;\n" +
                             "        END IF;\n" +
                             "    END LOOP;\n" +
-                            "    COMMIT;\n" +  // 남은 row 커밋
+                            "    COMMIT;\n" +
                             "END;"
             );
 
             cstmt.execute();
             cstmt.close();
 
+            // 결과 출력
             CouponUtil.countInsertion(conn);
         } catch (SQLException e) {
             System.err.println("[ERROR] 발송 건수: " + count);

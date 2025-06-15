@@ -1,26 +1,25 @@
+package multi;
+
 import java.sql.*;
 import java.time.LocalDate;
 
-public class Multi_Calc_Bonus_by_stmt_2 {
+public class Multi_Calc_Bonus_by_stmt_1 {
 
     public static void run(Connection conn, int startRow, int endRow) {
         int count = 0;
 
         try {
-            Statement selectStmt = conn.createStatement();
-            selectStmt.setFetchSize(10);
 
-            // 페이징 처리된 범위 조회
-            ResultSet rs = selectStmt.executeQuery(
+            // 1. 페이징 조회
+            Statement stmt = conn.createStatement();
+            stmt.setFetchSize(10);
+            ResultSet rs = stmt.executeQuery(
                     String.format(
                             "SELECT * FROM (SELECT ROWNUM AS RN, C.* FROM CUSTOMER C) " +
                                     "WHERE RN BETWEEN %d AND %d",
                             startRow, endRow
                     )
             );
-
-            // insert용 Statement 단 1회 생성
-            Statement insertStmt = conn.createStatement();
 
             String yyyymm = "202506";
             LocalDate baseDate = LocalDate.of(2013, 1, 1);
@@ -45,18 +44,19 @@ public class Multi_Calc_Bonus_by_stmt_2 {
                         yyyymm, customerId, email, couponCd, credit
                 );
 
-                insertStmt.executeUpdate(insertSQL);
-                count++;
+                try (Statement insertStmt = conn.createStatement()) {
+                    insertStmt.executeUpdate(insertSQL);
+                    count++;
+                }
             }
 
             rs.close();
-            selectStmt.close();
-            insertStmt.close();
+            stmt.close();
 
             System.out.printf("[THREAD %s] 처리 완료 - %d건%n", Thread.currentThread().getName(), count);
 
         } catch (SQLException e) {
-            System.err.printf("[THREAD %s] 오류 발생. insert count = %d%n", Thread.currentThread().getName(), count);
+            System.err.printf("[THREAD %s] ERROR 발생. insert count = %d%n", Thread.currentThread().getName(), count);
             e.printStackTrace();
         }
     }

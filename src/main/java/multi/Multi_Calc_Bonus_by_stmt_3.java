@@ -1,33 +1,31 @@
-import java.sql.*;
-import java.time.LocalDate;
+package multi;
 
-public class Multi_Calc_Bonus_by_stmt_1 {
+import java.sql.*;
+
+public class Multi_Calc_Bonus_by_stmt_3 {
 
     public static void run(Connection conn, int startRow, int endRow) {
         int count = 0;
 
         try {
-
-            // 1. 페이징 조회
-            Statement stmt = conn.createStatement();
-            stmt.setFetchSize(10);
-            ResultSet rs = stmt.executeQuery(
+            // 지급 대상만 포함하는 조건 + ROWNUM으로 페이징
+            Statement selectStmt = conn.createStatement();
+            selectStmt.setFetchSize(10);
+            ResultSet rs = selectStmt.executeQuery(
                     String.format(
-                            "SELECT * FROM (SELECT ROWNUM AS RN, C.* FROM CUSTOMER C) " +
+                            "SELECT * FROM (SELECT ROWNUM AS RN, C.* " +
+                                    "FROM (SELECT ID, EMAIL, CREDIT_LIMIT, GENDER, ADDRESS1 " +
+                                    "      FROM CUSTOMER " +
+                                    "      WHERE ENROLL_DT >= TO_DATE('20130101', 'YYYYMMDD')) C) " +
                                     "WHERE RN BETWEEN %d AND %d",
                             startRow, endRow
                     )
             );
 
+            Statement insertStmt = conn.createStatement();
             String yyyymm = "202506";
-            LocalDate baseDate = LocalDate.of(2018, 1, 1);
 
             while (rs.next()) {
-                Date enrollDt = rs.getDate("ENROLL_DT");
-                if (enrollDt == null || enrollDt.toLocalDate().isBefore(baseDate)) {
-                    continue;
-                }
-
                 String customerId = rs.getString("ID");
                 String email = rs.getString("EMAIL");
                 int credit = rs.getInt("CREDIT_LIMIT");
@@ -42,20 +40,20 @@ public class Multi_Calc_Bonus_by_stmt_1 {
                         yyyymm, customerId, email, couponCd, credit
                 );
 
-                try (Statement insertStmt = conn.createStatement()) {
-                    insertStmt.executeUpdate(insertSQL);
-                    count++;
-                }
+                insertStmt.executeUpdate(insertSQL);
+                count++;
             }
 
             rs.close();
-            stmt.close();
+            selectStmt.close();
+            insertStmt.close();
 
             System.out.printf("[THREAD %s] 처리 완료 - %d건%n", Thread.currentThread().getName(), count);
 
         } catch (SQLException e) {
-            System.err.printf("[THREAD %s] ERROR 발생. insert count = %d%n", Thread.currentThread().getName(), count);
+            System.err.printf("[THREAD %s] 오류 발생. insert count = %d%n", Thread.currentThread().getName(), count);
             e.printStackTrace();
         }
     }
 }
+

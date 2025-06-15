@@ -1,3 +1,5 @@
+package common;
+
 public class Coupon {
 
     public static String getCode(int credit, String gender, String addr) {

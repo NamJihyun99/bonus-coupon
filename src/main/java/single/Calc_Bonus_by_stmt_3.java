@@ -1,31 +1,35 @@
-import java.sql.*;
-import java.time.LocalDate;
+package single;
 
-public class Calc_Bonus_by_stmt_1 {
+import common.*;
+
+import java.sql.*;
+
+public class Calc_Bonus_by_stmt_3 {
 
     static void run() {
-        int count = 0;
 
+        int count = 0;
         try (Connection conn = DBConnectionUtil.getNewConnection()) {
 
-            // 1. 전체 고객 데이터 조회
-            Statement stmt = conn.createStatement();
-            stmt.setFetchSize(10);
-            ResultSet rs = stmt.executeQuery(
-                    "SELECT ID, EMAIL, ENROLL_DT, CREDIT_LIMIT, GENDER, ADDRESS1 FROM CUSTOMER "
+            // 1. 테이블 초기화
+            CouponUtil.truncate(conn);
+
+            // 2. insert용 Statement는 1회만 생성하여 재사용
+            Statement insertStmt = conn.createStatement();
+
+            // 3. 지급 대상만 SELECT (WHERE 조건 포함)
+            Statement selectStmt = conn.createStatement();
+            selectStmt.setFetchSize(10);
+            ResultSet rs = selectStmt.executeQuery(
+                    "SELECT ID, EMAIL, CREDIT_LIMIT, GENDER, ADDRESS1 " +
+                            "FROM CUSTOMER " +
+                            "WHERE ENROLL_DT >= TO_DATE('20130101', 'YYYYMMDD') "
             );
 
-            // 2. 고객 데이터 필터링 및 BONUS_COUPON Insert
             String yyyymm = "202506";
 
-            LocalDate baseDate = LocalDate.of(2018, 1, 1);
-
+            // 5. 로직 수행
             while (rs.next()) {
-                Date enrollDt = rs.getDate("ENROLL_DT");
-                if (enrollDt == null || enrollDt.toLocalDate().isBefore(baseDate)) {
-                    continue;
-                }
-
                 String customerId = rs.getString("ID");
                 String email = rs.getString("EMAIL");
                 int credit = rs.getInt("CREDIT_LIMIT");
@@ -34,24 +38,25 @@ public class Calc_Bonus_by_stmt_1 {
 
                 String couponCd = Coupon.getCode(credit, gender, addr);
 
-                // Insert
                 String insertSQL = String.format(
                         "INSERT INTO BONUS_COUPON (YYYYMM, CUSTOMER_ID, EMAIL, COUPON_CD, CREDIT_POINT, SEND_DT, RECEIVE_DT, USE_DT) " +
                                 "VALUES ('%s', '%s', '%s', '%s', %d, NULL, NULL, NULL)",
                         yyyymm, customerId, email, couponCd, credit
                 );
 
-                try (Statement insertStmt = conn.createStatement()) {
-                    insertStmt.executeUpdate(insertSQL);
-                    count++;
-                }
+                // auto commit : statement 실행마다 commit
+                insertStmt.executeUpdate(insertSQL);
+                count++;
             }
+
+            // 6. 자원 정리 및 종료 처리
             rs.close();
-            stmt.close();
+            selectStmt.close();
+            insertStmt.close();
 
             CouponUtil.countInsertion(conn);
         } catch (SQLException e) {
-            System.err.println("[ERROR] insert count = " + count);
+            System.err.println("[ERROR] 발송 건수: " + count);
             e.printStackTrace();
         }
     }

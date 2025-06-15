@@ -1,8 +1,10 @@
+package common;
+
 import java.sql.*;
 
 public class CouponUtil {
 
-    static void countInsertion(Connection conn) {
+    public static void countInsertion(Connection conn) {
         try (Statement stmt = conn.createStatement()) {
             // 총 건수
             ResultSet totalRs = stmt.executeQuery("SELECT COUNT(*) FROM BONUS_COUPON");
@@ -29,7 +31,7 @@ public class CouponUtil {
         }
     }
 
-    static int countAll(Connection conn) {
+    public static int countAll(Connection conn) {
         String sql = "SELECT COUNT(*) FROM CUSTOMER";
         int total = 0;
 
@@ -49,8 +51,8 @@ public class CouponUtil {
         return total;
     }
 
-    static int countCondition(Connection conn) {
-        String sql = "SELECT COUNT(*) FROM CUSTOMER WHERE ENROLL_DT >= TO_DATE('20180101', 'YYYYMMDD')";
+    public static int countCondition(Connection conn) {
+        String sql = "SELECT COUNT(*) FROM CUSTOMER WHERE ENROLL_DT >= TO_DATE('20130101', 'YYYYMMDD')";
         int total = 0;
 
         try (Statement stmt = conn.createStatement();
@@ -69,7 +71,7 @@ public class CouponUtil {
         return total;
     }
 
-    static void truncate(Connection conn) throws SQLException {
+    public static void truncate(Connection conn) throws SQLException {
         try (Statement truncateStmt = conn.createStatement()) {
             truncateStmt.executeUpdate("TRUNCATE TABLE BONUS_COUPON");
         }

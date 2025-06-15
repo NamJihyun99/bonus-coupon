@@ -1,34 +1,38 @@
-import java.sql.*;
-import java.text.SimpleDateFormat;
+package single;
 
-public class Calc_Bonus_by_pstmt_2 {
+import common.*;
+
+import java.sql.*;
+
+public class Calc_Bonus_by_pstmt_1 {
+
     public static void run() {
         int count = 0;
+
         try (Connection conn = DBConnectionUtil.getNewConnection()) {
+            // auto commit 해제
             conn.setAutoCommit(false);
 
             // 1. BONUS_COUPON 테이블 초기화
             CouponUtil.truncate(conn);
 
-            // 2. insert용 PreparedStatement 생성
+            // 2. insert용 PreparedStatement 1회 생성 (Hard Parsing 개선)
             String insertSQL = "INSERT INTO BONUS_COUPON " +
                     "(YYYYMM, CUSTOMER_ID, EMAIL, COUPON_CD, CREDIT_POINT, SEND_DT, RECEIVE_DT, USE_DT) " +
-                    "VALUES (?, ?, ?, ?, ?,NULL, NULL, NULL)";
+                    "VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL)";
             PreparedStatement insertPstmt = conn.prepareStatement(insertSQL);
 
-            // 3. SELECT 지급 대상 + fetch size 조정
+            // 3. 지급 대상 SELECT + fetch size 1000
             Statement selectStmt = conn.createStatement();
             selectStmt.setFetchSize(1000);
             ResultSet rs = selectStmt.executeQuery(
                     "SELECT ID, EMAIL, CREDIT_LIMIT, GENDER, ADDRESS1 " +
                             "FROM CUSTOMER " +
-                            "WHERE ENROLL_DT >= TO_DATE('20180101', 'YYYYMMDD') "
+                            "WHERE ENROLL_DT >= TO_DATE('20130101', 'YYYYMMDD') "
             );
-
             String yyyymm = "202506";
 
             int batchCount = 0;
-            int commitCount = 0;
 
             while (rs.next()) {
                 String customerId = rs.getString("ID");
@@ -38,35 +42,27 @@ public class Calc_Bonus_by_pstmt_2 {
                 String addr = rs.getString("ADDRESS1");
                 String couponCd = Coupon.getCode(credit, gender, addr);
 
-               insertPstmt.setString(1, yyyymm);
-               insertPstmt.setString(2, customerId);
-               insertPstmt.setString(3, email);
-               insertPstmt.setString(4, couponCd);
-               insertPstmt.setInt(5, credit);
+                // 파라미터 바인딩
+                insertPstmt.setString(1, yyyymm);
+                insertPstmt.setString(2, customerId);
+                insertPstmt.setString(3, email);
+                insertPstmt.setString(4, couponCd);
+                insertPstmt.setInt(5, credit);
 
-               insertPstmt.addBatch();
-               count++;
-               batchCount++;
+                insertPstmt.executeUpdate();
+                count++;
+                batchCount++;
 
-               // 1,000건마다 executeBatch()
-                if (batchCount >= 1000) {
-                    insertPstmt.executeBatch();
+                if (batchCount >= 10_000) {
+                    conn.commit();
                     batchCount = 0;
                 }
-
-                // 10,000건마다 commit()
-                if (count % 10_000 == 0) {
-                    conn.commit();
-                }
             }
 
-            // 남은 batch 처리
+            // 마지막 잔여 커밋
             if (batchCount > 0) {
-                insertPstmt.executeBatch();
+                conn.commit();
             }
-
-            // 잔여 커밋
-            conn.commit();
 
             // 리소스 정리
             rs.close();
